@@ -1,0 +1,125 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "nandini"
+date: "24/06/2020"
+output: html_document
+---
+
+```{r setup,include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret)
+library(readr)
+library(parallel)
+library(doParallel)
+
+```
+
+# Overview
+
+The aim of this report is to predict how well a person performs an exercise by taking into account various parameters. The dataset taken consists of 6 healthy persons performing 1 set of 10 reps of Dumbbell biceps curl in 5 different fashions.The 5 different fashions include:
+Class A:exactly according to the specification,
+Class B:throwing the elbows to the front,
+Class C:lifting the dumbbell only halfway,
+Class D:lowering the dumbbell only halfway, 
+Class E:throwing the hips to the front.
+Class A corressponds to the correct way of performing the exercise while other classes include common mistakes.
+Here I will be training three Machine learning models to predict the Class and I will be choosing the best model to predict for the test dataset.
+
+```{r cars}
+pmltrain<-read.csv("pml-training.csv",na.strings = c("NA","","#DIV/0!"))
+pmltest<-read.csv("pml-testing.csv",na.strings = c("NA","","#DIV/0!"))
+```
+
+# Processing datset
+
+Eliminating columns with more than 60% of NA values.
+Eliminating unecessary columns.
+Converting three columns to factors.
+
+```{r pressure}
+dim(pmltrain)
+rno<-which((colSums(!is.na(pmltrain)))>(0.6*nrow(pmltrain)))
+rnot<-which((colSums(!is.na(pmltest)))>(0.6*nrow(pmltest)))
+pmltrain<-pmltrain[,rno]
+pmltest<-pmltest[,rnot]
+pmltrain<-pmltrain[,-c(1,5)]
+pmltest<-pmltest[,-c(1,5,60)]
+pmltrain$user_name=as.factor(pmltrain$user_name)
+pmltrain$classe=as.factor(pmltrain$classe)
+pmltrain$new_window=as.factor(pmltrain$new_window)
+pmltest$user_name=as.factor(pmltest$user_name)
+pmltest$new_window=as.factor(pmltest$new_window)
+```
+```{r}
+set.seed(1231)
+inTrain<-createDataPartition(pmltrain$classe,p=.7,list=FALSE)
+training<-pmltrain[inTrain,]
+testing<-pmltrain[-inTrain,]
+dim(training)
+plot(training$classe)
+```
+
+# Prediction Models
+I will use parallel processing to run these models in order to decrease the computational time.
+
+## 1 Decision Tree
+```{r}
+set.seed(1221)
+cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
+registerDoParallel(cluster)
+fitControl <- trainControl(method = "cv",number = 5,allowParallel = TRUE)
+fit0<-train(classe~.,data=training,method="rpart",trControl=fitControl)
+cm0<-confusionMatrix(predict(fit0,testing),testing$classe)
+cm0
+```
+The accuracy for test set=.5995.
+
+Variable Importance:
+```{r}
+plot(varImp(fit0),top=20)
+```
+
+
+
+## 2 Random Forest
+```{r}
+set.seed(1331)
+fit1<-train(classe~.,data=training,method="rf",trControl=fitControl)
+cm1<-confusionMatrix(predict(fit1,testing),testing$classe)
+cm1
+```
+The accuracy for test set=.9992.
+
+Variable Importance:
+```{r}
+plot(varImp(fit1),top=20)
+```
+
+## 3 Linear Discriminant Analysis
+```{r,results='hide'}
+set.seed(1441)
+fit2<-train(classe~.,data=training,method="lda",trControl=fitControl)
+```
+```{r}
+cm2<-confusionMatrix(predict(fit2,testing),testing$classe)
+cm2
+```
+The accuracy for test set=.7455.
+
+# Comparing Models
+```{r}
+result<-resamples(list(DecisionTree=fit0,RandomForest=fit1,LDA=fit2))
+summary(result)
+scales<-list(x=list(relation="free"),y=list(relation="free")) 
+dotplot(result,scales=scales)
+```
+
+Random Forest has the highest accuracy.So I choose Random Forest as the best model for predicting class for this dataset.
+
+# Predicting Test set
+```{r}
+predictedclass<-predict(fit2,pmltest)
+predictedclass
+stopCluster(cluster)
+registerDoSEQ()
+```
