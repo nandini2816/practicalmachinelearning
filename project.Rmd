@@ -88,7 +88,7 @@ fit1<-train(classe~.,data=training,method="rf",trControl=fitControl)
 cm1<-confusionMatrix(predict(fit1,testing),testing$classe)
 cm1
 ```
-The accuracy for test set=.9992.
+The accuracy for test set=.9992,and thus lowest out of sample error.
 
 Variable Importance:
 ```{r}
@@ -114,11 +114,11 @@ scales<-list(x=list(relation="free"),y=list(relation="free"))
 dotplot(result,scales=scales)
 ```
 
-Random Forest has the highest accuracy.So I choose Random Forest as the best model for predicting class for this dataset.
+Random Forest has the highest accuracy .So I choose Random Forest as the best model for predicting class for this dataset.
 
 # Predicting Test set
 ```{r}
-predictedclass<-predict(fit2,pmltest)
+predictedclass<-predict(fit1,pmltest)
 predictedclass
 stopCluster(cluster)
 registerDoSEQ()
